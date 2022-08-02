@@ -26,10 +26,8 @@ parser.add_argument('--no-cuda', action='store_true', default=False,
                     help='disable training on GPU (default: False)')
 args = parser.parse_args()
 
-if not args.no_cuda:
-    # Disable CUDA if there are no GPUs.
-    if mx.context.num_gpus() == 0:
-        args.no_cuda = True
+if not args.no_cuda and mx.context.num_gpus() == 0:
+    args.no_cuda = True
 
 logging.basicConfig(level=logging.INFO)
 logging.info(args)
@@ -49,23 +47,25 @@ def get_mnist_iterator(rank):
     batch_size = args.batch_size
 
     train_iter = mx.io.MNISTIter(
-        image="%s/train-images-idx3-ubyte" % data_dir,
-        label="%s/train-labels-idx1-ubyte" % data_dir,
+        image=f"{data_dir}/train-images-idx3-ubyte",
+        label=f"{data_dir}/train-labels-idx1-ubyte",
         input_shape=input_shape,
         batch_size=batch_size,
         shuffle=True,
         flat=False,
         num_parts=hvd.size(),
-        part_index=hvd.rank()
+        part_index=hvd.rank(),
     )
 
+
     val_iter = mx.io.MNISTIter(
-        image="%s/t10k-images-idx3-ubyte" % data_dir,
-        label="%s/t10k-labels-idx1-ubyte" % data_dir,
+        image=f"{data_dir}/t10k-images-idx3-ubyte",
+        label=f"{data_dir}/t10k-labels-idx1-ubyte",
         input_shape=input_shape,
         batch_size=batch_size,
         flat=False,
     )
+
 
     return train_iter, val_iter
 
@@ -88,7 +88,7 @@ def conv_nets():
 def evaluate(model, data_iter, context):
     data_iter.reset()
     metric = mx.metric.Accuracy()
-    for _, batch in enumerate(data_iter):
+    for batch in data_iter:
         data = batch.data[0].as_in_context(context)
         label = batch.label[0].as_in_context(context)
         output = model(data.astype(args.dtype, copy=False))
